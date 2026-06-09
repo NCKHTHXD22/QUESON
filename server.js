@@ -161,6 +161,21 @@ app.post('/admin/set-tokens', async (req, res) => {
   }
 });
 
+// ── Internal sync endpoint (chỉ localhost) ─────────────
+app.post('/internal/sync-followers', async (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const { syncFollowers } = require('./src/services/followerService');
+    const followers = await syncFollowers();
+    res.json({ ok: true, count: followers.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── REST API cho React frontend ────────────────────────
 const apiRouter = require('./src/routes/index');
 app.use('/api', apiRouter);
