@@ -11,12 +11,13 @@ async function fetchWaterOutage(query = '') {
   const allItems = (res.data || []).sort((a, b) => new Date(a.mat_nuoc_tu) - new Date(b.mat_nuoc_tu));
 
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const q = query.toLowerCase().trim().normalize('NFC');
 
-  if (!query || query === 'tat ca' || query === 'tất cả' || query === 'tatca') {
+  if (!q || q === 'tat ca' || q === 'tất cả' || q === 'tatca') {
     return allItems.filter(item => new Date(item.mat_nuoc_den) >= startOfToday).slice(0, 5);
   }
 
-  const dateMatch = query.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  const dateMatch = q.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
   if (dateMatch) {
     const [, d, m] = dateMatch;
     return allItems.filter(item => {
@@ -25,7 +26,7 @@ async function fetchWaterOutage(query = '') {
     }).slice(0, 5);
   }
 
-  const kw = query.toLowerCase().normalize('NFC');
+  const kw = q;
   return allItems
     .filter(item => new Date(item.mat_nuoc_den) >= startOfToday)
     .filter(item => {
