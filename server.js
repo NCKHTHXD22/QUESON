@@ -126,6 +126,17 @@ app.get('/webhook', (req, res) => {
 
 app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
+
+  // Nếu có FORWARD_WEBHOOK_TO → chỉ forward sang VPS, không xử lý ở đây
+  if (process.env.FORWARD_WEBHOOK_TO) {
+    const axios = require('axios');
+    axios.post(`${process.env.FORWARD_WEBHOOK_TO}/webhook`, req.body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 5000,
+    }).catch(err => console.error('[Webhook] Forward lỗi:', err.message));
+    return;
+  }
+
   try {
     await handleWebhook(req.body);
   } catch (err) {
