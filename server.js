@@ -161,10 +161,10 @@ app.post('/admin/set-tokens', async (req, res) => {
   }
 });
 
-// ── Internal sync endpoint (chỉ localhost) ─────────────
+// ── Internal sync endpoint (bảo vệ bằng secret token) ──
 app.post('/internal/sync-followers', async (req, res) => {
-  const ip = req.ip || req.connection.remoteAddress;
-  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip)) {
+  const secret = req.headers['x-sync-secret'] || req.query.secret;
+  if (!secret || secret !== process.env.SYNC_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
