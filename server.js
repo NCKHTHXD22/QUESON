@@ -174,6 +174,10 @@ app.get('/zalo_verifierMy2z1PYq6XmTWRKu-gqbEpgZaXZMrKT1CJCm.html', (req, res) =>
   res.type('html').send('There Is No Limit To What You Can Accomplish Using Zalo!');
 });
 
+app.get('/zalo_verifierOFpW5E3FJ1Xguy4-eUrB0sVec1w8dar8EJ4r.html', (req, res) => {
+  res.type('html').send('There Is No Limit To What You Can Accomplish Using Zalo!');
+});
+
 app.get('/', async (req, res) => {
   const { code } = req.query;
   if (code) {
@@ -199,7 +203,7 @@ app.get('/', async (req, res) => {
       return res.type('html').send(`<h2>❌ Lỗi: ${err.message}</h2>`);
     }
   }
-  res.type('html').send(`<!DOCTYPE html><html><head><meta name="zalo-platform-site-verification" content="My2z1PYq6XmTWRKu-gqbEpgZaXZMrKT1CJCm" /></head><body>UBND phuong Que Son - OA Zalo</body></html>`);
+  res.type('html').send(`<!DOCTYPE html><html><head><meta name="zalo-platform-site-verification" content="OFpW5E3FJ1Xguy4-eUrB0sVec1w8dar8EJ4r" /></head><body>UBND phuong Que Son - OA Zalo</body></html>`);
 });
 
 app.get('/health', (req, res) => {
