@@ -3,7 +3,7 @@ services:
     name: tienichoazalo-queson
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install --omit=dev
     startCommand: node server.js
     healthCheckPath: /health
     envVars:
