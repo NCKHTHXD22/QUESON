@@ -1,5 +1,6 @@
 const router = require('express').Router()
 const Category = require('../models/Category')
+const ZaloGroupMember = require('../models/ZaloGroupMember')
 const requireRole = require('../middleware/requireRole')
 
 // GET / — danh sách tất cả loại phản ánh
@@ -29,6 +30,17 @@ router.put('/:id', requireRole('superadmin'), async (req, res) => {
   try {
     const { name, zaloGroupId, icon, order } = req.body
     await Category.findByIdAndUpdate(req.params.id, { name, zaloGroupId, icon, order })
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /:id — xóa danh mục và toàn bộ thành viên (superadmin)
+router.delete('/:id', requireRole('superadmin'), async (req, res) => {
+  try {
+    await ZaloGroupMember.deleteMany({ categoryId: req.params.id })
+    await Category.findByIdAndDelete(req.params.id)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })

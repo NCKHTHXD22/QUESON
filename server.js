@@ -69,18 +69,6 @@ mongoose.connect(CONFIG.MONGO_URI)
       console.log('[Admin] Tài khoản mặc định: admin / admin@2025 — đổi mật khẩu sau khi đăng nhập!');
     }
 
-    // Seed 4 danh mục phản ánh mặc định
-    const catCount = await Category.countDocuments();
-    if (catCount === 0) {
-      const defaultCategories = [
-        { name: 'Môi trường, Hạ tầng, Xây dựng',    zaloGroupId: '6f2ab62e124cfb12a25d', icon: '🏗️', order: 1 },
-        { name: 'Văn hoá, Giáo dục, Y tế',            zaloGroupId: '10d632c896aa7ff426bb', icon: '🏫', order: 2 },
-        { name: 'Dịch vụ công, Thủ tục hành chính',  zaloGroupId: '5f8db19515f7fca9a5e6', icon: '📋', order: 3 },
-        { name: 'An ninh trật tự, PCCC',              zaloGroupId: 'e8dd38c69ca475fa2cb5', icon: '🚔', order: 4 },
-      ];
-      await Category.insertMany(defaultCategories);
-      console.log('[Seed] Đã tạo 4 danh mục phản ánh mặc định');
-    }
   })
   .catch(err => console.error('[MongoDB] Lỗi kết nối:', err.message));
 
@@ -98,21 +86,33 @@ app.get('/debug-profile/:userId', async (req, res) => {
     const token = getToken();
     const uid = req.params.userId;
 
-    // Test v2 getprofile (bị block IP ngoài VN)
-    const v2data = encodeURIComponent(JSON.stringify({ user_id: uid }));
+    // Test v2 getprofile — truyền user_id dạng số nguyên (tránh lỗi string vs number)
+    const v2dataNum = encodeURIComponent(`{"user_id":${uid}}`);
     const v2 = await axios.get(
-      `https://openapi.zalo.me/v2.0/oa/getprofile?data=${v2data}`,
+      `https://openapi.zalo.me/v2.0/oa/getprofile?data=${v2dataNum}`,
       { headers: { access_token: token } }
     ).then(r => r.data).catch(e => ({ error: e.message }));
 
-    // Test v3 user/detail (cần permission Quản lý người dùng)
-    const v3data = encodeURIComponent(JSON.stringify({ user_id: uid }));
-    const v3 = await axios.get(
-      `https://openapi.zalo.me/v3.0/oa/user/detail?data=${v3data}`,
+    // Test v2 getprofile — truyền user_id dạng string (để so sánh)
+    const v2dataStr = encodeURIComponent(JSON.stringify({ user_id: uid }));
+    const v2str = await axios.get(
+      `https://openapi.zalo.me/v2.0/oa/getprofile?data=${v2dataStr}`,
       { headers: { access_token: token } }
     ).then(r => r.data).catch(e => ({ error: e.message }));
 
-    res.json({ v2_getprofile: v2, v3_user_detail: v3, token_prefix: token.slice(0, 20) + '...' });
+    // Test raw getfollowers (1 người) để xem format user_id trả về
+    const fdata = encodeURIComponent(JSON.stringify({ offset: 0, count: 1 }));
+    const followers = await axios.get(
+      `https://openapi.zalo.me/v2.0/oa/getfollowers?data=${fdata}`,
+      { headers: { access_token: token } }
+    ).then(r => r.data).catch(e => ({ error: e.message }));
+
+    res.json({
+      v2_as_number: v2,
+      v2_as_string: v2str,
+      getfollowers_sample: followers,
+      token_prefix: token.slice(0, 20) + '...',
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

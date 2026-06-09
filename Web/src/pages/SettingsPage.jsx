@@ -24,7 +24,7 @@ function Avatar({ name, avatar, size = 8 }) {
   )
 }
 
-function CategoryMemberPanel({ cat, followers }) {
+function CategoryMemberPanel({ cat, followers, onDelete }) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
@@ -110,6 +110,19 @@ function CategoryMemberPanel({ cat, followers }) {
             >
               {syncMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               Đồng bộ
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (window.confirm(`Xóa nhóm "${cat.name}"? Toàn bộ ${members.length} thành viên cũng sẽ bị xóa.`)) {
+                  onDelete(cat._id)
+                }
+              }}
+              className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Xóa nhóm"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
             {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
           </div>
@@ -241,7 +254,13 @@ function CategoryMemberPanel({ cat, followers }) {
   )
 }
 
+const ICONS = ['🏗️', '🏫', '📋', '🚔', '🌿', '💧', '🏥', '🏛️', '🔧', '📢']
+
 export default function SettingsPage() {
+  const queryClient = useQueryClient()
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [form, setForm] = useState({ name: '', icon: '📋', zaloGroupId: '' })
+
   const { data: catsData, isLoading } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.get('/api/categories').then((r) => r.data),
@@ -252,26 +271,141 @@ export default function SettingsPage() {
     queryFn: () => api.get('/api/broadcast/followers').then((r) => r.data),
   })
 
+  const createMutation = useMutation({
+    mutationFn: (data) => api.post('/api/categories', data).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Đã tạo nhóm mới')
+      setShowAddForm(false)
+      setForm({ name: '', icon: '📋', zaloGroupId: '' })
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Lỗi tạo nhóm'),
+  })
+
+  const deleteCatMutation = useMutation({
+    mutationFn: (id) => api.delete(`/api/categories/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Đã xóa nhóm')
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Lỗi xóa nhóm'),
+  })
+
   const categories = catsData?.categories ?? []
   const followers = followersData?.followers ?? []
 
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.name.trim() || !form.zaloGroupId.trim()) return
+    createMutation.mutate({ ...form, order: categories.length + 1 })
+  }
+
   return (
     <div className="space-y-4 animate-fade-in max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold">Cài đặt nhóm Zalo</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Quản lý danh sách cán bộ trong từng nhóm để phân công xử lý phản ánh
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Cài đặt nhóm Zalo</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Quản lý danh sách cán bộ trong từng nhóm để phân công xử lý phản ánh
+          </p>
+        </div>
+        {!showAddForm && (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shrink-0"
+          >
+            <Plus className="h-4 w-4" /> Thêm nhóm
+          </button>
+        )}
       </div>
+
+      {/* Form thêm nhóm mới */}
+      {showAddForm && (
+        <form onSubmit={handleSubmit} className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+          <p className="text-sm font-semibold text-blue-700">Thêm nhóm Zalo mới</p>
+
+          <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-500 font-medium">Icon</label>
+              <div className="flex flex-wrap gap-1 max-w-[160px]">
+                {ICONS.map((ic) => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, icon: ic }))}
+                    className={`h-8 w-8 rounded-md text-base transition-colors ${form.icon === ic ? 'bg-blue-200 ring-2 ring-blue-400' : 'bg-white hover:bg-blue-100'}`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-500 font-medium">Tên nhóm</label>
+                <input
+                  type="text"
+                  placeholder="VD: Môi trường, Hạ tầng..."
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-500 font-medium">Zalo Group ID</label>
+                <input
+                  type="text"
+                  placeholder="VD: 6f2ab62e124cfb12a25d"
+                  value={form.zaloGroupId}
+                  onChange={(e) => setForm((f) => ({ ...f, zaloGroupId: e.target.value }))}
+                  required
+                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => { setShowAddForm(false); setForm({ name: '', icon: '📋', zaloGroupId: '' }) }}
+              className="px-3 py-1.5 rounded-md text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Tạo nhóm
+            </button>
+          </div>
+        </form>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center h-40">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
+      ) : categories.length === 0 ? (
+        <div className="text-center py-12 text-sm text-slate-400">
+          <Users className="h-10 w-10 mx-auto mb-3 text-slate-200" />
+          Chưa có nhóm nào — nhấn "Thêm nhóm" để tạo
+        </div>
       ) : (
         <div className="space-y-3">
           {categories.map((cat) => (
-            <CategoryMemberPanel key={cat._id} cat={cat} followers={followers} />
+            <CategoryMemberPanel
+              key={cat._id}
+              cat={cat}
+              followers={followers}
+              onDelete={(id) => deleteCatMutation.mutate(id)}
+            />
           ))}
         </div>
       )}

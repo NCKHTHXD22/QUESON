@@ -93,14 +93,17 @@ async function fetchAllFollowerIds() {
 }
 
 async function getFollowerProfile(userId) {
-  const data = encodeURIComponent(JSON.stringify({ user_id: userId }));
+  // Dùng số nguyên thay vì string để tránh lỗi -201 "user_id is not valid"
+  // JSON.stringify({ user_id: userId }) tạo {"user_id":"123..."} (string) → Zalo reject
+  // Template literal giữ nguyên chuỗi số gốc mà không qua float64
+  const data = encodeURIComponent(`{"user_id":${userId}}`);
   const result = await zaloGet(
     `https://openapi.zalo.me/v2.0/oa/getprofile?data=${data}`
   );
-  if (result?.error !== 0) return { user_id: userId, display_name: userId, avatar: '' };
+  if (result?.error !== 0) return { user_id: userId, display_name: '', avatar: '' };
   return {
     user_id: userId,
-    display_name: result?.data?.display_name || userId,
+    display_name: result?.data?.display_name || '',
     avatar: result?.data?.avatar || '',
   };
 }
@@ -110,8 +113,23 @@ async function syncFollowers() {
   console.log('[Follower] Đang đồng bộ danh sách follower...');
   const ids = await fetchAllFollowerIds();
 
-  // Lấy profile từ cache webhook (không bị giới hạn IP như getprofile API)
+  // Lấy profile từ cache webhook trước
   const profileMap = await getProfiles(ids);
+
+  // Fetch từ Zalo API cho những user chưa có tên (hoạt động tốt từ IP Việt Nam)
+  const missingIds = ids.filter(id => !profileMap[id]?.display_name);
+  console.log(`[Follower] Cần fetch ${missingIds.length} profile từ Zalo API...`);
+  for (const userId of missingIds) {
+    try {
+      const profile = await getFollowerProfile(userId);
+      if (profile.display_name) {
+        profileMap[userId] = profile;
+        const { saveProfile } = require('./profileCache');
+        await saveProfile(userId, profile.display_name, profile.avatar);
+      }
+    } catch {}
+    await new Promise(r => setTimeout(r, 250));
+  }
 
   const profiles = ids.map(id => ({
     user_id: id,
