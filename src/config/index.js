@@ -20,7 +20,7 @@ module.exports = {
   IOCTC_USERNAME: process.env.IOCTC_USERNAME || '',
   IOCTC_PASSWORD: process.env.IOCTC_PASSWORD || '',
 
-  // ===== DAWACO (Lịch cắt nước Đà Nẵng) =====
-  DAWACO_EMAIL: process.env.DAWACO_EMAIL || '',
-  DAWACO_PASSWORD: process.env.DAWACO_PASSWORD || '',
+  // ===== DAWACO Proxy (Lịch cắt nước Đà Nẵng) =====
+  DAWACO_PROXY_URL: process.env.DAWACO_PROXY_URL || 'http://103.107.182.191:3456',
+  DAWACO_PROXY_KEY: process.env.DAWACO_PROXY_KEY || 'zalo2025secret',
 };

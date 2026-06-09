@@ -1,93 +1,150 @@
 const axios = require('axios');
 const CONFIG = require('../config');
-const { sendZaloText } = require('../utils/zaloApi');
+const { sendZaloText, uploadImageToZalo, sendZaloImage } = require('../utils/zaloApi');
+const { htmlToPng } = require('../utils/imageGen');
 
-const BASE_URL = 'https://portal.dawaco.com.vn';
-let tokenCache = { token: null, expiry: 0 };
-
-async function getToken() {
-  if (tokenCache.token && Date.now() < tokenCache.expiry) return tokenCache.token;
-  console.log('[DAWACO] Đang lấy token...');
-  const res = await axios.post(
-    `${BASE_URL}/api/Account/Login`,
-    { email: CONFIG.DAWACO_EMAIL, password: CONFIG.DAWACO_PASSWORD },
-    { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
-  );
-  const token = res.data?.token || res.data?.accessToken || res.data?.access_token;
-  if (!token) throw new Error('Không lấy được token DAWACO');
-  tokenCache = { token, expiry: Date.now() + 20 * 60 * 60 * 1000 };
-  console.log('[DAWACO] Lấy token thành công');
-  return token;
-}
-
-async function fetchOutages() {
-  const token = await getToken();
-  const res = await axios.get(`${BASE_URL}/api/LichCatNuoc`, {
-    headers: { Authorization: `Bearer ${token}` },
+async function fetchWaterOutage(query = '') {
+  const res = await axios.get(`${CONFIG.DAWACO_PROXY_URL}/catnuoc`, {
+    headers: { 'x-api-key': CONFIG.DAWACO_PROXY_KEY },
     timeout: 15000,
   });
-  return Array.isArray(res.data) ? res.data : (res.data?.data || res.data?.items || []);
-}
+  const allItems = (res.data || []).sort((a, b) => new Date(a.mat_nuoc_tu) - new Date(b.mat_nuoc_tu));
 
-function formatOutageItem(item) {
-  const ngay    = item.NgayCatNuoc || item.ngayCatNuoc || item.date || '—';
-  const tuGio   = item.TuGio       || item.tuGio       || item.timeFrom || '';
-  const denGio  = item.DenGio      || item.denGio      || item.timeTo   || '';
-  const khuVuc  = item.KhuVuc      || item.khuVuc      || item.area     || '—';
-  const lyDo    = item.LyDo        || item.lyDo        || item.reason   || '';
-  const thoiGian = tuGio && denGio ? `${tuGio} – ${denGio}` : (tuGio || denGio || '—');
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
 
-  return (
-    `📍 Khu vực: ${khuVuc}\n` +
-    `📅 Ngày: ${ngay}\n` +
-    `⏰ Thời gian: ${thoiGian}` +
-    (lyDo ? `\n📌 Lý do: ${lyDo}` : '')
-  );
-}
-
-function matchesFilter(item, query) {
-  const q = query.toLowerCase().trim();
-  if (!q || q === 'tất cả' || q === 'tat ca') return true;
-
-  const khuVuc = (item.KhuVuc || item.khuVuc || item.area || '').toLowerCase();
-  const ngay   = (item.NgayCatNuoc || item.ngayCatNuoc || item.date || '').toLowerCase();
-
-  // Tìm theo tên phường/xã
-  if (khuVuc.includes(q)) return true;
-  // Tìm theo ngày (dd/mm hoặc dd-mm)
-  const dateNorm = q.replace(/-/g, '/');
-  if (ngay.includes(dateNorm)) return true;
-
-  return false;
-}
-
-async function sendWaterOutageCard(userId, query) {
-  const items = await fetchOutages();
-
-  const matched = items.filter(item => matchesFilter(item, query));
-
-  if (!matched.length) {
-    const hint = (query.toLowerCase() === 'tất cả' || query.toLowerCase() === 'tat ca')
-      ? 'Hiện tại không có lịch tạm ngưng cấp nước nào.'
-      : `Không tìm thấy lịch cắt nước cho "${query}".\n\nVui lòng thử tên phường/xã khác hoặc nhắn "tất cả" để xem toàn bộ.`;
-    await sendZaloText(userId, `💧 ${hint}`);
-    return;
+  if (!query || query === 'tat ca' || query === 'tất cả' || query === 'tatca') {
+    return allItems.filter(item => new Date(item.mat_nuoc_den) >= startOfToday).slice(0, 5);
   }
 
-  const MAX_ITEMS = 5;
-  const shown = matched.slice(0, MAX_ITEMS);
-  const lines = shown.map((item, i) => `${i + 1}. ${formatOutageItem(item)}`).join('\n\n');
-  const footer = matched.length > MAX_ITEMS
-    ? `\n\n(Hiển thị ${MAX_ITEMS}/${matched.length} kết quả. Nhập tên phường/xã cụ thể hơn để thu hẹp.)`
-    : '';
+  const dateMatch = query.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  if (dateMatch) {
+    const [, d, m] = dateMatch;
+    return allItems.filter(item => {
+      const dt = new Date(item.mat_nuoc_tu);
+      return dt.getDate() === parseInt(d) && (dt.getMonth() + 1) === parseInt(m);
+    }).slice(0, 5);
+  }
 
-  await sendZaloText(userId,
+  const kw = query.toLowerCase().normalize('NFC');
+  return allItems
+    .filter(item => new Date(item.mat_nuoc_den) >= startOfToday)
+    .filter(item => {
+      const haystack = `${item.title || ''} ${item.content || ''}`.toLowerCase().normalize('NFC');
+      return haystack.includes(kw);
+    })
+    .slice(0, 5);
+}
+
+function formatDateTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const days = ['CN', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7'];
+  return `${days[d.getDay()]} ${d.toLocaleDateString('vi-VN')} lúc ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function formatWaterOutageText(items) {
+  if (!items.length) {
+    return '✅ Hiện không có lịch tạm ngưng cấp nước nào trong thời gian tới.\n\n📍 Nguồn: DAWACO Đà Nẵng';
+  }
+  const lines = items.map((item, i) => {
+    const tu = formatDateTime(item.mat_nuoc_tu);
+    const den = new Date(item.mat_nuoc_den).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return `${i + 1}. ${item.title}\n   ⏰ ${tu} → ${den}`;
+  });
+  return (
     `💧 LỊCH TẠM NGƯNG CẤP NƯỚC\n` +
-    `${'─'.repeat(28)}\n\n` +
-    lines +
-    footer +
-    `\n\n📞 Hotline DAWACO: 0236 3800 115`
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    lines.join('\n\n') +
+    `\n━━━━━━━━━━━━━━━━━━━\n` +
+    `📍 Nguồn: DAWACO Đà Nẵng`
   );
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatTimeShort(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateShort(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function getWaterOutageCardHtml(items, query = '') {
+  const rows = items.map(item => {
+    const title = escapeHtml(item.title || '—');
+    const tu = escapeHtml(formatTimeShort(item.mat_nuoc_tu));
+    const den = escapeHtml(formatTimeShort(item.mat_nuoc_den));
+    const ngay = escapeHtml(formatDateShort(item.mat_nuoc_tu));
+    const shortContent = escapeHtml((item.content || '').split('\n')[0].trim());
+    return `
+    <div class="item">
+      <div class="item-title">${title}</div>
+      <div class="item-time">⏰ ${ngay} &nbsp;|&nbsp; ${tu} – ${den}</div>
+      <div class="item-content">${shortContent}</div>
+    </div>`;
+  }).join('');
+
+  const emptyMsg = query
+    ? `<div class="empty">✅ Không tìm thấy lịch cắt nước cho "<b>${escapeHtml(query)}</b>".<br>Thử nhập tên khác hoặc nhắn "tất cả".</div>`
+    : `<div class="empty">✅ Hiện không có lịch tạm ngưng cấp nước.</div>`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, sans-serif; background: white; width: 520px; }
+.card { width: 520px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.header { background: #0277BD; padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
+.logo { width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.header-title { color: white; font-size: 15px; font-weight: bold; }
+.header-sub { color: rgba(255,255,255,0.8); font-size: 12px; margin-top: 3px; }
+.body { padding: 4px 0; }
+.item { padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+.item:last-child { border-bottom: none; }
+.item-title { font-size: 13px; font-weight: bold; color: #1a1a1a; line-height: 1.4; margin-bottom: 5px; }
+.item-time { font-size: 12px; color: #0277BD; font-weight: bold; margin-bottom: 4px; }
+.item-content { font-size: 12px; color: #555; line-height: 1.4; }
+.empty { padding: 20px 18px; font-size: 14px; color: #2e7d32; text-align: center; }
+.footer { background: #f5f5f5; padding: 8px 18px; font-size: 11px; color: #888; text-align: right; }
+</style></head>
+<body><div class="card">
+  <div class="header">
+    <div class="logo">💧</div>
+    <div>
+      <div class="header-title">Lịch tạm ngưng cấp nước</div>
+      <div class="header-sub">${query ? `Khu vực: ${escapeHtml(query)} · ` : ''}Nguồn: DAWACO Đà Nẵng</div>
+    </div>
+  </div>
+  <div class="body">${items.length ? rows : emptyMsg}</div>
+  <div class="footer">Cập nhật: ${new Date().toLocaleString('vi-VN')}</div>
+</div></body></html>`;
+}
+
+async function sendWaterOutageCard(userId, query = '') {
+  try {
+    const items = await fetchWaterOutage(query);
+    const filepath = await htmlToPng(getWaterOutageCardHtml(items, query));
+    const attachmentId = await uploadImageToZalo(filepath);
+    await sendZaloImage(userId, attachmentId);
+    console.log('[CatNuoc] Gửi card thành công');
+  } catch (err) {
+    console.error('[CatNuoc] Lỗi card, fallback về text:', err.message);
+    try {
+      const items = await fetchWaterOutage(query);
+      await sendZaloText(userId, formatWaterOutageText(items));
+    } catch (err2) {
+      console.error('[CatNuoc] Lỗi fallback:', err2.message);
+      await sendZaloText(userId, '⚠️ Không thể lấy lịch cắt nước. Vui lòng thử lại sau.');
+    }
+  }
 }
 
 module.exports = { sendWaterOutageCard };
