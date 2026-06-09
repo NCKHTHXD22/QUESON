@@ -107,7 +107,7 @@ async function handleWebhook(body) {
 
   // Xử lý text và submit_info
   if (eventName === 'user_send_text' || eventName === 'user_submit_info') {
-    let text = '';
+    let text;
     if (eventName === 'user_send_text') {
       // Kiểm tra contact card trong attachment
       const attachments = body.message?.attachments || [];

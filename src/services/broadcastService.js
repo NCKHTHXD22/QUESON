@@ -2,7 +2,6 @@ const {
   sendZaloText, sendZaloTextToGroup,
   sendZaloImages, sendZaloImagesToGroup,
   sendZaloImageWithLink, sendZaloImageWithLinkToGroup,
-  sendZaloVideoToGroup,
   sendZaloFile, sendZaloFileToGroup,
 } = require('../utils/zaloApi');
 const { addLog } = require('./logService');

@@ -1,4 +1,4 @@
-const { sendZaloText, sendZaloButtons, sendZaloToGroup, getZaloUserProfile } = require('../utils/zaloApi');
+const { sendZaloText, sendZaloToGroup, getZaloUserProfile } = require('../utils/zaloApi');
 const { uploadFromUrl, uploadFromZaloImageUrl } = require('../utils/cloudinary');
 const Feedback = require('../models/Feedback');
 const Category = require('../models/Category');

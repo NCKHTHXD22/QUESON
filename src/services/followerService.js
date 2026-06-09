@@ -59,7 +59,7 @@ async function zaloGet(url) {
       const newToken = await refreshAccessToken();
       res = await doReq(newToken);
     } catch (refreshErr) {
-      throw new Error('TOKEN_EXPIRED');
+      throw new Error('TOKEN_EXPIRED', { cause: refreshErr });
     }
   }
   return res.data;
@@ -127,7 +127,7 @@ async function syncFollowers() {
         const { saveProfile } = require('./profileCache');
         await saveProfile(userId, profile.display_name, profile.avatar);
       }
-    } catch {}
+    } catch { /* bỏ qua lỗi profile từng user */ }
     await new Promise(r => setTimeout(r, 250));
   }
 

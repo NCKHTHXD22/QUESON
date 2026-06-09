@@ -37,10 +37,10 @@ async function getProfiles(userIds) {
     const values = res.data.result || [];
     userIds.forEach((id, i) => {
       if (values[i]) {
-        try { result[id] = JSON.parse(values[i]); } catch {}
+        try { result[id] = JSON.parse(values[i]); } catch { /* ignore parse error */ }
       }
     });
-  } catch {}
+  } catch { /* ignore redis error */ }
   return result;
 }
 

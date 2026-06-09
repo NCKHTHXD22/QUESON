@@ -17,7 +17,7 @@ async function fetchWaterOutage(query = '') {
     return allItems.filter(item => new Date(item.mat_nuoc_den) >= startOfToday).slice(0, 5);
   }
 
-  const dateMatch = q.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  const dateMatch = q.match(/^(\d{1,2})[/-](\d{1,2})$/);
   if (dateMatch) {
     const [, d, m] = dateMatch;
     return allItems.filter(item => {

@@ -7,7 +7,7 @@ const { syncFollowers, getStoredFollowers, getSyncedAt } = require('../services/
 const { getStoredGroups, addGroup, removeGroup } = require('../services/groupService')
 const { sendToUsers, getJob } = require('../services/broadcastService')
 const { getLogs } = require('../services/logService')
-const { uploadImageToZalo, uploadFileToZalo, getZaloUserProfile } = require('../utils/zaloApi')
+const { uploadImageToZalo, uploadFileToZalo } = require('../utils/zaloApi')
 
 const UPLOAD_DIR = path.join(__dirname, '../../public/images')
 
