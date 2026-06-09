@@ -22,7 +22,7 @@ export default function LoginPage() {
     mutationFn: (data) => api.post('/api/auth/login', data).then((r) => r.data),
     onSuccess: (data) => {
       setAuth(data.user, data.token)
-      navigate('/dashboard', { replace: true })
+      navigate('/messages', { replace: true })
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Đăng nhập thất bại'),
   })
