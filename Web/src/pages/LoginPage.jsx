@@ -92,7 +92,7 @@ export default function LoginPage() {
           UBND Xã<br />Quế Sơn
         </h1>
         <p className="text-blue-300/80 text-base leading-relaxed max-w-xs mx-auto">
-          Hệ thống tiếp nhận & quản lý<br />góp ý, phản ánh từ người dân
+          Hệ thống gửi thông tin, cảnh báo<br />đến người dân, cán bộ, lãnh đạo
         </p>
       </div>
     </div>
