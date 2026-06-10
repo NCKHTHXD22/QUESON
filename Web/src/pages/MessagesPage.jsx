@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Send, RefreshCw, Loader2, Image, Video, FileText, Users, History,
   X, Plus, Trash2, Search, CheckSquare, Square, ChevronDown, ChevronUp,
-  AlertTriangle, ExternalLink,
+  AlertTriangle, ExternalLink, Clock, CalendarClock, Ban,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -75,6 +75,7 @@ function TabBar({ active, onChange }) {
     { id: 'send',      label: 'Gửi tin nhắn', icon: Send },
     { id: 'followers', label: 'Followers & Nhóm', icon: Users },
     { id: 'logs',      label: 'Lịch sử gửi', icon: History },
+    { id: 'schedule',  label: 'Lên lịch', icon: CalendarClock },
   ]
   return (
     <div className="flex gap-1 rounded-2xl bg-slate-100 p-1">
@@ -922,6 +923,495 @@ function LogsTab() {
   )
 }
 
+// ── helpers cho ScheduleTab ───────────────────────────────────────────────────
+const STATUS_LABEL = {
+  pending:   { text: 'Chờ gửi',   cls: 'bg-blue-100 text-blue-700' },
+  sending:   { text: 'Đang gửi',  cls: 'bg-amber-100 text-amber-700' },
+  done:      { text: 'Đã gửi',    cls: 'bg-green-100 text-green-700' },
+  failed:    { text: 'Thất bại',  cls: 'bg-red-100 text-red-700' },
+  cancelled: { text: 'Đã hủy',   cls: 'bg-slate-100 text-slate-500' },
+}
+
+function toLocalDatetimeValue(date) {
+  const d = new Date(date)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// ── ScheduleTab ────────────────────────────────────────────────────────────────
+function ScheduleTab({ followers, groups }) {
+  const qc = useQueryClient()
+
+  // form state
+  const [title, setTitle] = useState('')
+  const [attachType, setAttachType] = useState('image')
+  const [imgPreviews, setImgPreviews] = useState([])
+  const [videoInfo, setVideoInfo] = useState(null)
+  const [fileInfo, setFileInfo] = useState(null)
+  const [message, setMessage] = useState('')
+  const [adminNote, setAdminNote] = useState('')
+  const [recipientText, setRecipientText] = useState('')
+  const [groupText, setGroupText] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [followerPickerOpen, setFollowerPickerOpen] = useState(false)
+  const [followerSearch, setFollowerSearch] = useState('')
+  const [selectedFollowers, setSelectedFollowers] = useState(new Set())
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false)
+
+  const linkMatch = message.match(/https?:\/\/[^\s]+/)?.[0] || ''
+
+  // upload mutations (reuse same endpoints)
+  const uploadImageMut = useMutation({
+    mutationFn: (fd) => api.post('/api/broadcast/upload/image', fd).then(r => r.data),
+  })
+  const uploadVideoMut = useMutation({
+    mutationFn: (fd) => api.post('/api/broadcast/upload/video', fd).then(r => r.data),
+  })
+  const uploadFileMut = useMutation({
+    mutationFn: (fd) => api.post('/api/broadcast/upload/file', fd).then(r => r.data),
+  })
+
+  const scheduleMut = useMutation({
+    mutationFn: (body) => api.post('/api/broadcast/schedule', body).then(r => r.data),
+    onSuccess: () => {
+      toast.success('Đã lên lịch gửi tin thành công!')
+      setTitle(''); setMessage(''); setAdminNote('')
+      setRecipientText(''); setGroupText(''); setScheduledAt('')
+      setImgPreviews([]); setVideoInfo(null); setFileInfo(null)
+      qc.invalidateQueries({ queryKey: ['scheduled-messages'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Lỗi đặt lịch'),
+  })
+
+  const cancelMut = useMutation({
+    mutationFn: (id) => api.delete(`/api/broadcast/schedule/${id}`).then(r => r.data),
+    onSuccess: () => {
+      toast.success('Đã hủy lịch gửi')
+      qc.invalidateQueries({ queryKey: ['scheduled-messages'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Lỗi hủy lịch'),
+  })
+
+  const { data: schedData, isLoading: schedLoading } = useQuery({
+    queryKey: ['scheduled-messages'],
+    queryFn: () => api.get('/api/broadcast/schedule').then(r => r.data),
+    refetchInterval: 15000,
+  })
+
+  async function handleImageFiles(files) {
+    const allowed = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 5 - imgPreviews.length)
+    if (!allowed.length) return
+    const previews = allowed.map(f => ({ file: f, url: URL.createObjectURL(f), id: null }))
+    setImgPreviews(prev => [...prev, ...previews])
+    const fd = new FormData()
+    allowed.forEach(f => fd.append('images', f))
+    try {
+      const data = await uploadImageMut.mutateAsync(fd)
+      setImgPreviews(prev => {
+        const next = [...prev]
+        let idx = 0
+        for (let i = 0; i < next.length; i++) {
+          if (!next[i].id && idx < data.attachmentIds.length) {
+            next[i] = { ...next[i], id: data.attachmentIds[idx++] }
+          }
+        }
+        return next
+      })
+    } catch (e) { toast.error(e.response?.data?.error || 'Upload ảnh thất bại') }
+  }
+
+  async function handleVideoFile(file) {
+    if (!file) return
+    setVideoInfo({ file, articleToken: null })
+    const fd = new FormData()
+    fd.append('video', file)
+    try {
+      const data = await uploadVideoMut.mutateAsync(fd)
+      setVideoInfo(prev => prev ? { ...prev, articleToken: data.articleToken } : null)
+    } catch (e) { toast.error(e.response?.data?.error || 'Upload video thất bại'); setVideoInfo(null) }
+  }
+
+  async function handleFileUpload(file) {
+    if (!file) return
+    setFileInfo({ file, attachmentId: null, filename: file.name })
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const data = await uploadFileMut.mutateAsync(fd)
+      setFileInfo(prev => prev ? { ...prev, attachmentId: data.attachmentId } : null)
+    } catch (e) { toast.error(e.response?.data?.error || 'Upload file thất bại'); setFileInfo(null) }
+  }
+
+  function buildUserIds() {
+    return recipientText.split('\n').map(l => l.trim()).filter(Boolean)
+  }
+  function buildGroupIds() {
+    return groupText.split('\n').map(l => l.trim()).filter(Boolean)
+  }
+
+  function addFollowersToPicker() {
+    const lines = Array.from(selectedFollowers).join('\n')
+    setRecipientText(prev => prev.trim() ? `${prev.trim()}\n${lines}` : lines)
+    setFollowerPickerOpen(false)
+    setSelectedFollowers(new Set())
+  }
+
+  const filteredFollowers = (followers || []).filter(f =>
+    !followerSearch || f.display_name?.toLowerCase().includes(followerSearch.toLowerCase()) || f.user_id?.includes(followerSearch)
+  )
+
+  async function handleSchedule() {
+    const userIds = buildUserIds()
+    const groupIds = buildGroupIds()
+    if (!userIds.length && !groupIds.length) return toast.error('Chưa nhập người nhận hoặc nhóm')
+    if (!scheduledAt) return toast.error('Chưa chọn thời gian gửi')
+    const scheduledDate = new Date(scheduledAt)
+    if (scheduledDate <= new Date()) return toast.error('Thời gian gửi phải ở tương lai')
+    const attachmentIds = imgPreviews.filter(p => p.id).map(p => p.id)
+    const hasContent = message.trim() || attachmentIds.length || videoInfo?.articleToken || fileInfo?.attachmentId || linkMatch
+    if (!hasContent) return toast.error('Chưa có nội dung tin nhắn')
+
+    scheduleMut.mutate({
+      title: title.trim() || undefined,
+      message: message.trim() || undefined,
+      adminNote: adminNote.trim() || undefined,
+      attachmentIds: attachmentIds.length ? attachmentIds : undefined,
+      videoAttachmentId: videoInfo?.articleToken || undefined,
+      fileAttachmentId: fileInfo?.attachmentId || undefined,
+      linkUrl: linkMatch || undefined,
+      userIds,
+      groupIds,
+      scheduledAt: scheduledDate.toISOString(),
+    })
+  }
+
+  const totalRecipients = buildUserIds().length + buildGroupIds().length
+
+  return (
+    <div className="space-y-6">
+      {/* ── Form đặt lịch ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cột trái: nội dung */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Đính kèm (tuỳ chọn)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <AttachTypeTabs active={attachType} onChange={setAttachType} />
+              {attachType === 'image' && (
+                <div className="space-y-2">
+                  <label
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); handleImageFiles(e.dataTransfer.files) }}
+                  >
+                    <Image className="h-6 w-6 text-slate-300" />
+                    <span className="text-sm text-slate-400">Chọn hoặc kéo thả ảnh · tối đa 5 ảnh · 10MB/ảnh</span>
+                    <input type="file" accept="image/*" multiple className="hidden"
+                      onChange={e => handleImageFiles(e.target.files)} />
+                  </label>
+                  {imgPreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {imgPreviews.map((p, i) => (
+                        <div key={i} className="relative h-16 w-16 rounded-lg overflow-hidden border border-slate-200">
+                          <img src={p.url} alt="" className="h-full w-full object-cover" />
+                          {!p.id && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><Loader2 className="h-4 w-4 text-white animate-spin" /></div>}
+                          <button onClick={() => setImgPreviews(prev => prev.filter((_, j) => j !== i))}
+                            className="absolute top-0.5 right-0.5 rounded-full bg-red-500 text-white h-4 w-4 flex items-center justify-center hover:bg-red-600">
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {attachType === 'video' && (
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                    ⚠️ Video chỉ gửi được vào <strong>nhóm</strong> — user cá nhân sẽ nhận link text.
+                  </div>
+                  {!videoInfo ? (
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                      <Video className="h-6 w-6 text-slate-300" />
+                      <span className="text-sm text-slate-400">Chọn file video · tối đa 100MB</span>
+                      <input type="file" accept="video/*" className="hidden" onChange={e => handleVideoFile(e.target.files[0])} />
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <Video className="h-5 w-5 text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{videoInfo.file.name}</p>
+                        <p className="text-xs text-slate-400">{fmtBytes(videoInfo.file.size)}</p>
+                        {!videoInfo.articleToken && <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5"><Loader2 className="h-3 w-3 animate-spin" />Đang upload...</p>}
+                        {videoInfo.articleToken && <p className="text-xs text-green-600 mt-0.5">Đã upload</p>}
+                      </div>
+                      <button onClick={() => setVideoInfo(null)} className="text-red-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {attachType === 'file' && (
+                <div className="space-y-2">
+                  {!fileInfo ? (
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                      <FileText className="h-6 w-6 text-slate-300" />
+                      <span className="text-sm text-slate-400">Chọn file · .docx .pdf .xlsx · tối đa 20MB</span>
+                      <input type="file" accept=".docx,.pdf,.xlsx,.xls" className="hidden" onChange={e => handleFileUpload(e.target.files[0])} />
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <FileText className="h-5 w-5 text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{fileInfo.filename}</p>
+                        <p className="text-xs text-slate-400">{fmtBytes(fileInfo.file.size)}</p>
+                        {!fileInfo.attachmentId && <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5"><Loader2 className="h-3 w-3 animate-spin" />Đang upload...</p>}
+                        {fileInfo.attachmentId && <p className="text-xs text-green-600 mt-0.5">Đã upload</p>}
+                      </div>
+                      <button onClick={() => setFileInfo(null)} className="text-red-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div className="space-y-1.5">
+                <Label>Tên lịch (ghi chú nội bộ)</Label>
+                <Input
+                  placeholder="VD: Thông báo họp tháng 6"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Nội dung tin nhắn</Label>
+                  <span className="text-xs text-slate-400">{message.length}/2000</span>
+                </div>
+                <Textarea
+                  placeholder="Nhập nội dung tin nhắn&#10;Nếu có link (https://...) sẽ tự động nhúng nút bấm"
+                  value={message}
+                  onChange={e => setMessage(e.target.value.slice(0, 2000))}
+                  className="min-h-[120px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-400">Ghi chú nội bộ (không gửi đến người dùng)</Label>
+                <Input
+                  placeholder="VD: Thông báo sự kiện tháng 6"
+                  value={adminNote}
+                  onChange={e => setAdminNote(e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cột phải: người nhận + thời gian */}
+        <div className="space-y-4">
+          {/* Người nhận cá nhân */}
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" />Người nhận cá nhân</Label>
+                {followers?.length > 0 && (
+                  <button onClick={() => setFollowerPickerOpen(v => !v)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                    <Plus className="h-3.5 w-3.5" />Chọn từ danh sách Follower
+                  </button>
+                )}
+              </div>
+              {followerPickerOpen && (
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-2 border-b border-slate-100">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        placeholder="Tìm follower..."
+                        value={followerSearch}
+                        onChange={e => setFollowerSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                    {filteredFollowers.slice(0, 50).map(f => (
+                      <label key={f.user_id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                        <div onClick={() => setSelectedFollowers(prev => { const s = new Set(prev); s.has(f.user_id) ? s.delete(f.user_id) : s.add(f.user_id); return s })}>
+                          {selectedFollowers.has(f.user_id) ? <CheckSquare className="h-4 w-4 text-blue-500" /> : <Square className="h-4 w-4 text-slate-300" />}
+                        </div>
+                        <FollowerAvatar f={f} size={7} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{hasRealName(f) ? f.display_name : f.user_id}</p>
+                          {hasRealName(f) && <p className="text-xs text-slate-400 truncate">{f.user_id}</p>}
+                        </div>
+                      </label>
+                    ))}
+                    {filteredFollowers.length === 0 && <p className="py-4 text-center text-sm text-slate-400">Không tìm thấy</p>}
+                  </div>
+                  {selectedFollowers.size > 0 && (
+                    <div className="p-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Đã chọn {selectedFollowers.size} người</span>
+                      <Button size="sm" onClick={addFollowersToPicker}>Thêm vào danh sách</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <Textarea
+                placeholder={'Nhập Zalo ID, mỗi ID một dòng\n\nVD:\n1234567890\n9876543210'}
+                value={recipientText}
+                onChange={e => setRecipientText(e.target.value)}
+                className="min-h-[100px] text-sm font-mono"
+              />
+              <p className="text-xs text-slate-400">{buildUserIds().length} người</p>
+            </CardContent>
+          </Card>
+
+          {/* Nhóm */}
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 text-slate-600">💬 Nhóm nhận</Label>
+                {groups?.length > 0 && (
+                  <button onClick={() => setGroupPickerOpen(v => !v)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                    <Plus className="h-3.5 w-3.5" />Chọn nhóm từ danh sách
+                  </button>
+                )}
+              </div>
+              {groupPickerOpen && (
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="max-h-40 overflow-y-auto divide-y divide-slate-50">
+                    {(groups || []).map(g => (
+                      <label key={g.group_id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer"
+                        onClick={() => {
+                          setGroupText(prev => {
+                            const lines = prev.split('\n').map(l => l.trim()).filter(Boolean)
+                            if (lines.includes(g.group_id)) return prev
+                            return [...lines, g.group_id].join('\n')
+                          })
+                          setGroupPickerOpen(false)
+                        }}>
+                        <div className="h-7 w-7 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 text-xs font-bold shrink-0">
+                          {(g.name || g.group_id)[0]?.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{g.name || g.group_id}</p>
+                          <p className="text-xs text-slate-400 truncate">{g.group_id}</p>
+                        </div>
+                      </label>
+                    ))}
+                    {!groups?.length && <p className="py-4 text-center text-sm text-slate-400">Chưa có nhóm</p>}
+                  </div>
+                </div>
+              )}
+              <Textarea
+                placeholder="Nhập Group ID, mỗi ID một dòng"
+                value={groupText}
+                onChange={e => setGroupText(e.target.value)}
+                className="min-h-[80px] text-sm font-mono"
+              />
+              <p className="text-xs text-slate-400">{buildGroupIds().length} nhóm</p>
+            </CardContent>
+          </Card>
+
+          {/* Thời gian gửi */}
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <Label className="flex items-center gap-1.5"><Clock className="h-4 w-4" />Thời gian gửi</Label>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                min={toLocalDatetimeValue(new Date(Date.now() + 60000))}
+                onChange={e => setScheduledAt(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              {scheduledAt && (
+                <p className="text-xs text-slate-500">
+                  Gửi lúc: <strong>{fmtTs(new Date(scheduledAt).toISOString())}</strong>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="text-sm text-slate-500 font-medium px-1">
+            Tổng: <strong className="text-slate-800">{totalRecipients} người nhận</strong>
+          </div>
+
+          <Button
+            className="w-full h-12 text-base gap-2"
+            onClick={handleSchedule}
+            disabled={scheduleMut.isPending || uploadImageMut.isPending || uploadVideoMut.isPending || uploadFileMut.isPending}
+          >
+            {scheduleMut.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <CalendarClock className="h-5 w-5" />}
+            Đặt lịch gửi
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Danh sách lịch đã đặt ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2"><CalendarClock className="h-4 w-4" />Lịch đã đặt</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['scheduled-messages'] })}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Tải lại
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {schedLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>}
+          {!schedLoading && !schedData?.schedules?.length && (
+            <p className="py-8 text-center text-slate-400">Chưa có lịch nào được đặt.</p>
+          )}
+          {!schedLoading && schedData?.schedules?.length > 0 && (
+            <div className="space-y-2">
+              {schedData.schedules.map(s => {
+                const st = STATUS_LABEL[s.status] || STATUS_LABEL.pending
+                const totalR = (s.userIds?.length || 0) + (s.groupIds?.length || 0)
+                return (
+                  <div key={s._id} className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">{s.title || s.message?.slice(0, 40) || '[ảnh/file/video]'}</span>
+                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', st.cls)}>{st.text}</span>
+                      </div>
+                      {s.message && s.title && (
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{s.message.slice(0, 60)}{s.message.length > 60 ? '...' : ''}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{fmtTs(s.scheduledAt)}</span>
+                        <span>{totalR} người nhận</span>
+                        {s.attachmentIds?.length > 0 && <span>{s.attachmentIds.length} ảnh</span>}
+                        {s.videoAttachmentId && <span>video</span>}
+                        {s.fileAttachmentId && <span>file</span>}
+                      </div>
+                      {s.error && <p className="text-xs text-red-500 mt-1">Lỗi: {s.error}</p>}
+                      {s.adminNote && <p className="text-xs text-slate-400 mt-0.5">📝 {s.adminNote}</p>}
+                    </div>
+                    {s.status === 'pending' && (
+                      <button
+                        onClick={() => cancelMut.mutate(s._id)}
+                        disabled={cancelMut.isPending}
+                        className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium shrink-0 mt-0.5"
+                        title="Hủy lịch"
+                      >
+                        <Ban className="h-3.5 w-3.5" />Hủy
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function MessagesPage() {
   const { user } = useAuth()
@@ -956,6 +1446,12 @@ export default function MessagesPage() {
       )}
       {tab === 'followers' && <FollowersTab />}
       {tab === 'logs' && <LogsTab />}
+      {tab === 'schedule' && (
+        <ScheduleTab
+          followers={followersData?.followers}
+          groups={groupsData?.groups}
+        />
+      )}
     </div>
   )
 }

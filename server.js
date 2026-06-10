@@ -187,6 +187,9 @@ app.post('/internal/sync-followers', async (req, res) => {
   }
 });
 
+// ── Scheduler gửi tin nhắn theo lịch ──────────────────
+require('./src/services/schedulerService').start();
+
 // ── REST API cho React frontend ────────────────────────
 const apiRouter = require('./src/routes/index');
 app.use('/api', apiRouter);

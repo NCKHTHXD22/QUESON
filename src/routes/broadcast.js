@@ -233,4 +233,74 @@ router.get('/logs', async (req, res) => {
   res.json({ logs })
 })
 
+// ── Lên lịch gửi tin nhắn ─────────────────────────────────────────
+const ScheduledMessage = require('../models/ScheduledMessage')
+
+router.post('/schedule', async (req, res) => {
+  const {
+    title, message, adminNote,
+    attachmentIds, videoAttachmentId, fileAttachmentId,
+    linkUrl, linkTitle,
+    userIds, groupIds,
+    scheduledAt,
+  } = req.body
+
+  if (!scheduledAt) return res.status(400).json({ error: 'Cần chọn thời gian gửi (scheduledAt)' })
+
+  const scheduledDate = new Date(scheduledAt)
+  if (isNaN(scheduledDate.getTime())) return res.status(400).json({ error: 'scheduledAt không hợp lệ' })
+  if (scheduledDate <= new Date()) return res.status(400).json({ error: 'Thời gian gửi phải ở tương lai' })
+
+  const allRecipients = [...(userIds || []), ...(groupIds || [])]
+  if (!allRecipients.length) return res.status(400).json({ error: 'Cần ít nhất 1 người nhận hoặc nhóm' })
+
+  const hasContent = message || attachmentIds?.length || videoAttachmentId || fileAttachmentId || linkUrl
+  if (!hasContent) return res.status(400).json({ error: 'Cần nội dung, ảnh, video, file hoặc link' })
+
+  try {
+    const doc = await ScheduledMessage.create({
+      title: title || '',
+      message: message || '',
+      adminNote: adminNote || '',
+      attachmentIds: attachmentIds || [],
+      videoAttachmentId: videoAttachmentId || null,
+      fileAttachmentId: fileAttachmentId || null,
+      linkUrl: linkUrl || '',
+      linkTitle: linkTitle || '',
+      userIds: userIds || [],
+      groupIds: groupIds || [],
+      scheduledAt: scheduledDate,
+      createdBy: req.session?.user?.username || '',
+    })
+    res.json({ ok: true, id: doc._id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/schedule', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100
+    const docs = await ScheduledMessage.find()
+      .sort({ scheduledAt: 1 })
+      .limit(limit)
+      .lean()
+    res.json({ schedules: docs })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/schedule/:id', async (req, res) => {
+  try {
+    const doc = await ScheduledMessage.findById(req.params.id)
+    if (!doc) return res.status(404).json({ error: 'Không tìm thấy' })
+    if (doc.status !== 'pending') return res.status(400).json({ error: 'Chỉ có thể hủy lịch đang chờ (pending)' })
+    await ScheduledMessage.findByIdAndUpdate(req.params.id, { status: 'cancelled' })
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router
