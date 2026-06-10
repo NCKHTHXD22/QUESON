@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 
 const ROLE_LABELS = {
-  superadmin:  'Lãnh đạo Ủy ban',
-  dept_leader: 'Lãnh đạo phòng',
+  superadmin:  'Cán bộ quản trị',
+  dept_leader: 'Cán bộ phòng ban',
   officer:     'Cán bộ phụ trách',
   staff:       'Nhân viên',
 }
@@ -56,8 +56,8 @@ export default function Sidebar() {
           <Building2 className="h-5 w-5 text-white" />
         </div>
         <div className="min-w-0">
-          <p className="text-white text-sm font-bold leading-tight truncate">UBND Quế Sơn</p>
-          <p className="text-blue-400/70 text-[11px] mt-0.5">Cổng quản lý góp ý</p>
+          <p className="text-white text-sm font-bold leading-tight truncate">UBND Xã Quế Sơn</p>
+          <p className="text-blue-400/70 text-[11px] mt-0.5">Hệ thống gửi thông tin và quản lý</p>
         </div>
       </div>
 

@@ -10,10 +10,10 @@ import { formatDateShort } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const ROLE_CONFIG = {
-  superadmin:  { label: 'Lãnh đạo UB',    icon: ShieldCheck, className: 'text-amber-700 bg-amber-50' },
-  dept_leader: { label: 'Lãnh đạo phòng', icon: Shield,      className: 'text-purple-700 bg-purple-50' },
-  officer:     { label: 'Cán bộ',         icon: User,        className: 'text-blue-700 bg-blue-50' },
-  staff:       { label: 'Nhân viên',      icon: User,        className: 'text-slate-600 bg-slate-50' },
+  superadmin:  { label: 'Cán bộ quản trị', icon: ShieldCheck, className: 'text-amber-700 bg-amber-50' },
+  dept_leader: { label: 'Cán bộ phòng ban', icon: Shield,      className: 'text-purple-700 bg-purple-50' },
+  officer:     { label: 'Cán bộ phụ trách', icon: User,        className: 'text-blue-700 bg-blue-50' },
+  staff:       { label: 'Nhân viên',        icon: User,        className: 'text-slate-600 bg-slate-50' },
 }
 
 function RoleBadge({ role }) {
