@@ -22,14 +22,13 @@ async function zaloPost(url, data) {
 }
 
 async function sendZaloText(userId, text) {
-  try {
-    const res = await zaloPost(
-      'https://openapi.zalo.me/v2.0/oa/message',
-      { recipient: { user_id: String(userId) }, message: { text } }
-    );
-    if (res.data?.error !== 0) console.error('[Zalo] Lỗi gửi tin:', res.data);
-  } catch (err) {
-    console.error('[Zalo] Gửi tin thất bại:', err.message);
+  const res = await zaloPost(
+    'https://openapi.zalo.me/v2.0/oa/message',
+    { recipient: { user_id: String(userId) }, message: { text } }
+  );
+  if (res.data?.error !== 0) {
+    console.error('[Zalo] Lỗi gửi tin:', res.data);
+    throw new Error(`Zalo error ${res.data?.error}: ${res.data?.message}`);
   }
 }
 
@@ -98,15 +97,14 @@ async function sendZaloToGroup(text, groupId, mentions = []) {
     console.warn('[Zalo] Không có groupId, bỏ qua gửi nhóm.');
     return;
   }
-  try {
-    const message = mentions.length > 0 ? { text, mentions } : { text };
-    const res = await zaloPost(
-      'https://openapi.zalo.me/v2.0/oa/message',
-      { recipient: { group_id: String(targetId) }, message }
-    );
-    if (res.data?.error !== 0) console.error('[Zalo] Lỗi gửi tin nhóm:', res.data);
-  } catch (err) {
-    console.error('[Zalo] Gửi tin nhóm thất bại:', err.message);
+  const message = mentions.length > 0 ? { text, mentions } : { text };
+  const res = await zaloPost(
+    'https://openapi.zalo.me/v2.0/oa/message',
+    { recipient: { group_id: String(targetId) }, message }
+  );
+  if (res.data?.error !== 0) {
+    console.error('[Zalo] Lỗi gửi tin nhóm:', res.data);
+    throw new Error(`Zalo group error ${res.data?.error}: ${res.data?.message}`);
   }
 }
 
@@ -216,27 +214,25 @@ async function sendZaloImageWithLinkToGroup(groupId, attachmentId, url, buttonTi
 
 // Gửi file đến user
 async function sendZaloFile(userId, fileToken) {
-  try {
-    const res = await zaloPost('https://openapi.zalo.me/v2.0/oa/message', {
-      recipient: { user_id: String(userId) },
-      message: { attachment: { type: 'file', payload: { token: fileToken } } },
-    });
-    if (res.data?.error !== 0) console.error('[Zalo] Lỗi gửi file:', res.data);
-  } catch (err) {
-    console.error('[Zalo] Gửi file thất bại:', err.message);
+  const res = await zaloPost('https://openapi.zalo.me/v2.0/oa/message', {
+    recipient: { user_id: String(userId) },
+    message: { attachment: { type: 'file', payload: { token: fileToken } } },
+  });
+  if (res.data?.error !== 0) {
+    console.error('[Zalo] Lỗi gửi file:', res.data);
+    throw new Error(`Zalo file error ${res.data?.error}: ${res.data?.message}`);
   }
 }
 
 // Gửi file vào nhóm
 async function sendZaloFileToGroup(groupId, fileToken) {
-  try {
-    const res = await zaloPost('https://openapi.zalo.me/v2.0/oa/message', {
-      recipient: { group_id: String(groupId) },
-      message: { attachment: { type: 'file', payload: { token: fileToken } } },
-    });
-    if (res.data?.error !== 0) console.error('[Zalo] Lỗi gửi file nhóm:', res.data);
-  } catch (err) {
-    console.error('[Zalo] Gửi file nhóm thất bại:', err.message);
+  const res = await zaloPost('https://openapi.zalo.me/v2.0/oa/message', {
+    recipient: { group_id: String(groupId) },
+    message: { attachment: { type: 'file', payload: { token: fileToken } } },
+  });
+  if (res.data?.error !== 0) {
+    console.error('[Zalo] Lỗi gửi file nhóm:', res.data);
+    throw new Error(`Zalo file group error ${res.data?.error}: ${res.data?.message}`);
   }
 }
 
