@@ -98,6 +98,21 @@ router.post('/groups', async (req, res) => {
   }
 })
 
+router.put('/groups/:id', async (req, res) => {
+  const { name, group_id } = req.body
+  const oldId = req.params.id
+  if (!group_id?.trim()) return res.status(400).json({ error: 'Cần group_id mới' })
+  try {
+    // Xóa entry cũ nếu group_id thay đổi
+    let groups = await removeGroup(oldId)
+    // Upsert với dữ liệu mới
+    groups = await addGroup({ group_id: group_id.trim(), name: (name || '').trim() || group_id.trim() })
+    res.json({ ok: true, groups, count: groups.length })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.delete('/groups/:id', async (req, res) => {
   try {
     const groups = await removeGroup(req.params.id)

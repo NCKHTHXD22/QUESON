@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Send, RefreshCw, Loader2, Image, Video, FileText, Users, History,
   X, Plus, Trash2, Search, CheckSquare, Square, ChevronDown, ChevronUp,
-  AlertTriangle, ExternalLink, Clock, CalendarClock, Ban,
+  AlertTriangle, ExternalLink, Clock, CalendarClock, Ban, Pencil, Check,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -625,6 +625,9 @@ function FollowersTab() {
     },
   })
 
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ group_id: '', name: '' })
+
   const addGroupMut = useMutation({
     mutationFn: () => api.post('/api/broadcast/groups', newGroup).then(r => r.data),
     onSuccess: () => {
@@ -633,6 +636,17 @@ function FollowersTab() {
       toast.success('Đã thêm nhóm')
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Lỗi thêm nhóm'),
+  })
+
+  const updateGroupMut = useMutation({
+    mutationFn: ({ oldId, group_id, name }) =>
+      api.put(`/api/broadcast/groups/${oldId}`, { group_id, name }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['broadcast-groups'] })
+      setEditingId(null)
+      toast.success('Đã cập nhật nhóm')
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Lỗi cập nhật'),
   })
 
   const removeGroupMut = useMutation({
@@ -851,21 +865,70 @@ function FollowersTab() {
                   </thead>
                   <tbody>
                     {groups.length === 0 && (
-                      <tr><td colSpan={3} className="py-6 text-center text-slate-400">Chưa có nhóm nào.</td></tr>
+                      <tr><td colSpan={4} className="py-6 text-center text-slate-400">Chưa có nhóm nào.</td></tr>
                     )}
-                    {groups.map(g => (
-                      <tr key={g.group_id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="py-2.5 font-medium">{g.name}</td>
-                        <td className="py-2.5 font-mono text-xs text-slate-500">{g.group_id}</td>
-                        <td className="py-2.5">
-                          <button
-                            onClick={() => removeGroupMut.mutate(g.group_id)}
-                            disabled={removeGroupMut.isPending}
-                            className="text-slate-400 hover:text-red-500 transition-colors"
-                          ><Trash2 className="h-4 w-4" /></button>
-                        </td>
-                      </tr>
-                    ))}
+                    {groups.map(g => {
+                      const isEditing = editingId === g.group_id
+                      return (
+                        <tr key={g.group_id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                          {isEditing ? (
+                            <>
+                              <td className="py-2 pr-2">
+                                <input
+                                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  value={editForm.name}
+                                  onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                                  placeholder="Tên nhóm"
+                                />
+                              </td>
+                              <td className="py-2 pr-2">
+                                <input
+                                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  value={editForm.group_id}
+                                  onChange={e => setEditForm(p => ({ ...p, group_id: e.target.value }))}
+                                  placeholder="Group ID"
+                                />
+                              </td>
+                              <td className="py-2">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => updateGroupMut.mutate({ oldId: g.group_id, ...editForm })}
+                                    disabled={!editForm.group_id.trim() || updateGroupMut.isPending}
+                                    className="text-green-600 hover:text-green-800 disabled:opacity-40"
+                                    title="Lưu"
+                                  >
+                                    {updateGroupMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                  </button>
+                                  <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600" title="Hủy">
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-2.5 font-medium">{g.name}</td>
+                              <td className="py-2.5 font-mono text-xs text-slate-500">{g.group_id}</td>
+                              <td className="py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => { setEditingId(g.group_id); setEditForm({ group_id: g.group_id, name: g.name || '' }) }}
+                                    className="text-slate-400 hover:text-blue-500 transition-colors"
+                                    title="Sửa"
+                                  ><Pencil className="h-4 w-4" /></button>
+                                  <button
+                                    onClick={() => removeGroupMut.mutate(g.group_id)}
+                                    disabled={removeGroupMut.isPending}
+                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                    title="Xóa"
+                                  ><Trash2 className="h-4 w-4" /></button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
