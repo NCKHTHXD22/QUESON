@@ -89,19 +89,11 @@ export default function LoginPage() {
           <Building2 className="h-10 w-10 text-white" />
         </div>
         <h1 className="text-white text-3xl font-extrabold mb-3 leading-tight">
-          UBND Phường<br />Quế Sơn
+          UBND Xã<br />Quế Sơn
         </h1>
         <p className="text-blue-300/80 text-base leading-relaxed max-w-xs mx-auto">
           Hệ thống tiếp nhận & quản lý<br />góp ý, phản ánh từ người dân
         </p>
-        <div className="mt-8 flex flex-col gap-3 text-left max-w-xs mx-auto">
-          {['Tiếp nhận góp ý qua Zalo OA', 'Phân công & theo dõi xử lý', 'Phản hồi trực tiếp qua Zalo'].map((text) => (
-            <div key={text} className="flex items-center gap-3">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-500/30 text-cyan-400 text-[10px] font-bold">✓</span>
-              <span className="text-blue-200/80 text-sm">{text}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )
@@ -117,7 +109,7 @@ export default function LoginPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg mb-3">
               <Building2 className="h-7 w-7 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800">UBND Quế Sơn</h2>
+            <h2 className="text-xl font-bold text-slate-800">UBND Xã Quế Sơn</h2>
           </div>
 
           <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
@@ -127,7 +119,7 @@ export default function LoginPage() {
               <>
                 <div className="mb-7">
                   <h2 className="text-2xl font-extrabold text-slate-800">Đăng nhập</h2>
-                  <p className="text-slate-400 text-sm mt-1">Dành cho cán bộ UBND Quế Sơn</p>
+                  <p className="text-slate-400 text-sm mt-1">Dành cho cán bộ UBND Xã Quế Sơn</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-1.5">
@@ -185,7 +177,7 @@ export default function LoginPage() {
                   </button>
                 </div>
                 <p className="text-center text-[11px] text-slate-300 mt-4">
-                  Khu vực dành riêng cho cán bộ UBND &bull; Liên hệ quản trị để được hỗ trợ
+                  Khu vực dành riêng cho cán bộ UBND Xã Quế Sơn &bull; Liên hệ quản trị để được hỗ trợ
                 </p>
               </>
             )}
