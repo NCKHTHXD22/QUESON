@@ -6,7 +6,7 @@ const requireRole = require('../middleware/requireRole')
 const { syncFollowers, getStoredFollowers, getSyncedAt } = require('../services/followerService')
 const { getStoredGroups, addGroup, removeGroup } = require('../services/groupService')
 const { sendToUsers, getJob } = require('../services/broadcastService')
-const { getLogs } = require('../services/logService')
+const { getLogs, deleteLog, clearAllLogs } = require('../services/logService')
 const { uploadImageToZalo, uploadFileToZalo } = require('../utils/zaloApi')
 
 const UPLOAD_DIR = path.join(__dirname, '../../public/images')
@@ -231,6 +231,24 @@ router.get('/logs', async (req, res) => {
   const limit = parseInt(req.query.limit) || 50
   const logs = await getLogs(limit)
   res.json({ logs })
+})
+
+router.delete('/logs/all', async (req, res) => {
+  try {
+    await clearAllLogs()
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/logs/:id', async (req, res) => {
+  try {
+    await deleteLog(req.params.id)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ── Lên lịch gửi tin nhắn ─────────────────────────────────────────

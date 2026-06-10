@@ -19,7 +19,11 @@ async function redisCmd(...args) {
 }
 
 async function addLog(entry) {
-  const log = { ...entry, timestamp: new Date().toISOString() };
+  const log = {
+    ...entry,
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp: new Date().toISOString(),
+  };
 
   const pushed = await redisCmd('LPUSH', 'queson_msg_log', JSON.stringify(log));
   if (pushed !== null) {
@@ -38,4 +42,28 @@ async function getLogs(limit = 50) {
   return _memLogs.slice(0, limit);
 }
 
-module.exports = { addLog, getLogs };
+async function deleteLog(id) {
+  const raw = await redisCmd('LRANGE', 'queson_msg_log', 0, MAX_LOGS - 1);
+  if (raw !== null) {
+    const remaining = raw.filter(s => {
+      try { return JSON.parse(s).id !== id; } catch { return true; }
+    });
+    await redisCmd('DEL', 'queson_msg_log');
+    if (remaining.length > 0) {
+      // RPUSH để giữ thứ tự (mới nhất ở đầu list)
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        await redisCmd('LPUSH', 'queson_msg_log', remaining[i]);
+      }
+    }
+  } else {
+    const idx = _memLogs.findIndex(l => l.id === id);
+    if (idx !== -1) _memLogs.splice(idx, 1);
+  }
+}
+
+async function clearAllLogs() {
+  const deleted = await redisCmd('DEL', 'queson_msg_log');
+  if (deleted === null) _memLogs.length = 0;
+}
+
+module.exports = { addLog, getLogs, deleteLog, clearAllLogs };

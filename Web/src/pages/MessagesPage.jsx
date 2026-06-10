@@ -880,9 +880,30 @@ function FollowersTab() {
 // ── LogsTab ────────────────────────────────────────────────────────────────────
 function LogsTab() {
   const qc = useQueryClient()
+  const [confirmClearAll, setConfirmClearAll] = useState(false)
+
   const { data, isLoading } = useQuery({
     queryKey: ['broadcast-logs'],
     queryFn: () => api.get('/api/broadcast/logs').then(r => r.data),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id) => api.delete(`/api/broadcast/logs/${id}`).then(r => r.data),
+    onSuccess: () => {
+      toast.success('Đã xóa')
+      qc.invalidateQueries({ queryKey: ['broadcast-logs'] })
+    },
+    onError: () => toast.error('Xóa thất bại'),
+  })
+
+  const clearAllMut = useMutation({
+    mutationFn: () => api.delete('/api/broadcast/logs/all').then(r => r.data),
+    onSuccess: () => {
+      toast.success('Đã xóa toàn bộ lịch sử')
+      setConfirmClearAll(false)
+      qc.invalidateQueries({ queryKey: ['broadcast-logs'] })
+    },
+    onError: () => toast.error('Xóa thất bại'),
   })
 
   return (
@@ -890,9 +911,33 @@ function LogsTab() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Lịch sử gửi tin</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['broadcast-logs'] })}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Tải lại
-          </Button>
+          <div className="flex items-center gap-2">
+            {data?.logs?.length > 0 && (
+              confirmClearAll ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500">Xóa tất cả?</span>
+                  <button
+                    onClick={() => clearAllMut.mutate()}
+                    disabled={clearAllMut.isPending}
+                    className="text-xs font-medium text-red-600 hover:text-red-800 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
+                  >
+                    {clearAllMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Xác nhận'}
+                  </button>
+                  <button onClick={() => setConfirmClearAll(false)} className="text-xs text-slate-400 hover:text-slate-600">Hủy</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmClearAll(true)}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Xóa tất cả
+                </button>
+              )
+            )}
+            <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['broadcast-logs'] })}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Tải lại
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -903,16 +948,28 @@ function LogsTab() {
         {!isLoading && data?.logs?.length > 0 && (
           <div className="space-y-2">
             {data.logs.map((log, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
+              <div key={log.id || i} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{log.message || '[ảnh/file/video]'}</p>
                   {log.adminNote && <p className="text-xs text-slate-400 mt-0.5">📝 {log.adminNote}</p>}
                   <p className="text-xs text-slate-400 mt-1">{fmtTs(log.timestamp)}</p>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-slate-700">{log.recipientCount} người</p>
-                  <p className="text-xs text-green-600">{log.sent} thành công</p>
-                  {log.failed > 0 && <p className="text-xs text-red-500">{log.failed} thất bại</p>}
+                <div className="flex items-start gap-3 shrink-0">
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-slate-700">{log.recipientCount} người</p>
+                    <p className="text-xs text-green-600">{log.sent} thành công</p>
+                    {log.failed > 0 && <p className="text-xs text-red-500">{log.failed} thất bại</p>}
+                  </div>
+                  {log.id && (
+                    <button
+                      onClick={() => deleteMut.mutate(log.id)}
+                      disabled={deleteMut.isPending}
+                      className="mt-0.5 text-slate-300 hover:text-red-500 transition-colors"
+                      title="Xóa"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
