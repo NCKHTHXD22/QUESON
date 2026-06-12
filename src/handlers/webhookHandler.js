@@ -34,7 +34,7 @@ function armCatDienTimer(userId) {
       userStates.delete(userId);
       try { await sendZaloText(userId, 'Cảm ơn bạn đã dùng tiện ích của chúng tôi! ⚡'); } catch { /* bỏ qua */ }
     }
-  }, 10 * 1000);
+  }, 30 * 1000);
   catDienTimers.set(userId, t);
 }
 
@@ -189,9 +189,9 @@ async function handleWebhook(body) {
       setState(userId, 'catdien_active');
       clearCatDienTimer(userId);
       await sendZaloText(userId,
-        '⚡ Tra cứu lịch tạm ngừng cấp điện tại Đà Nẵng.\n\n' +
-        'Nhập tên 📍 trạm hoặc 📅 ngày để tra cứu.\n' +
-        'Ví dụ: Lộc Đại  hoặc  12/06\n\n' +
+        '⚡ Tra cứu lịch tạm ngừng cấp điện tại Quế Sơn.\n\n' +
+        'Nhập tên 📍 Thôn/Khối phố hoặc 📅 ngày để tra cứu.\n' +
+        'Ví dụ: Quế Cường  hoặc  12/06\n\n' +
         '(Nhắn "tất cả" để xem toàn bộ · Nhắn "huỷ" để thoát)'
       );
       return;
@@ -208,7 +208,7 @@ async function handleWebhook(body) {
       }
       await sendZaloText(userId,
         '✅ Thông tin đã hoàn tất, bạn cần tra cứu thêm không?\n' +
-        '(Quá trình sẽ tự động ngắt sau 10 giây)'
+        '(Quá trình sẽ tự động ngắt sau 30 giây)'
       );
       armCatDienTimer(userId);
       return;
