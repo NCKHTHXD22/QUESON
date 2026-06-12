@@ -208,13 +208,14 @@ function formatText(items, query = '') {
   if (!items.length) {
     return `✅ Hiện không có lịch tạm ngừng cấp điện${query ? ` cho "${query}"` : ''}.\n\n📍 Nguồn: EVNCPC`;
   }
-  const shown = items.slice(0, CARD_MAX_ITEMS);
+  const TEXT_MAX_ITEMS = 7;
+  const shown = items.slice(0, TEXT_MAX_ITEMS);
   const lines = shown.map((it, i) => {
     const reasonStr = it.reason ? `\n   ℹ️ Chi tiết: ${it.reason.trim()}` : '';
     return `${i + 1}. ${it.stationName} [${it.outageType}]\n   ⏰ ${dDate(it.fromDate)} ${dTime(it.fromDate)} – ${dTime(it.toDate)}${reasonStr}`;
   });
-  if (items.length > CARD_MAX_ITEMS) {
-    lines.push(`... và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
+  if (items.length > TEXT_MAX_ITEMS) {
+    lines.push(`... và ${items.length - TEXT_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
   }
   return `⚡ LỊCH TẠM NGỪNG CẤP ĐIỆN — QUẾ SƠN\n━━━━━━━━━━━━━━━━━━━\n${lines.join('\n\n')}\n━━━━━━━━━━━━━━━━━━━\n📍 Nguồn: EVNCPC`;
 }
