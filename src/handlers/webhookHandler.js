@@ -5,6 +5,7 @@ const {
 const { saveProfile } = require('../services/profileCache');
 const { searchDossier, extractDossiers, sendDossierCard, isDossierCode } = require('../services/hoSoService');
 const { sendWaterOutageCard } = require('../services/catNuocService');
+const { sendOutageCard } = require('../services/catDienService');
 const { addGroup } = require('../services/groupService');
 
 // Lưu trạng thái hội thoại theo userId (tự xóa sau 10 phút)
@@ -15,6 +16,26 @@ function setState(userId, state) {
   setTimeout(() => {
     if (userStates.get(userId) === state) userStates.delete(userId);
   }, 10 * 60 * 1000);
+}
+
+// Timer 10s cho luồng cắt điện: hết giờ không tra thêm → cảm ơn & kết thúc
+const catDienTimers = new Map();
+
+function clearCatDienTimer(userId) {
+  const t = catDienTimers.get(userId);
+  if (t) { clearTimeout(t); catDienTimers.delete(userId); }
+}
+
+function armCatDienTimer(userId) {
+  clearCatDienTimer(userId);
+  const t = setTimeout(async () => {
+    catDienTimers.delete(userId);
+    if (userStates.get(userId) === 'catdien_active') {
+      userStates.delete(userId);
+      try { await sendZaloText(userId, 'Cảm ơn bạn đã dùng tiện ích của chúng tôi! ⚡'); } catch { /* bỏ qua */ }
+    }
+  }, 10 * 1000);
+  catDienTimers.set(userId, t);
 }
 
 async function handleHoSoQuery(userId, code) {
@@ -133,6 +154,7 @@ async function handleWebhook(body) {
     // Huỷ trạng thái
     if (['huỷ', 'huy', 'cancel', 'thoát', 'thoat'].includes(lower)) {
       userStates.delete(userId);
+      clearCatDienTimer(userId);
       await sendZaloText(userId, 'Đã huỷ. Bạn có thể chọn lại từ menu bên dưới.');
       return;
     }
@@ -158,6 +180,37 @@ async function handleWebhook(body) {
         console.error('[CatNuoc] Lỗi:', err.message);
         await sendZaloText(userId, '⚠️ Không thể lấy lịch cắt nước. Vui lòng thử lại sau.');
       }
+      return;
+    }
+
+    // ── Lịch cắt điện ─────────────────────────────────────
+    if (lower.includes('cắt điện') || lower.includes('cúp điện') || lower.includes('mất điện') ||
+        lower.includes('ngắt điện') || lower.includes('catdien') || lower === '#lichcatdien') {
+      setState(userId, 'catdien_active');
+      clearCatDienTimer(userId);
+      await sendZaloText(userId,
+        '⚡ Tra cứu lịch tạm ngừng cấp điện tại Đà Nẵng.\n\n' +
+        'Nhập tên 📍 trạm hoặc 📅 ngày để tra cứu.\n' +
+        'Ví dụ: Lộc Đại  hoặc  12/06\n\n' +
+        '(Nhắn "tất cả" để xem toàn bộ · Nhắn "huỷ" để thoát)'
+      );
+      return;
+    }
+
+    if (state === 'catdien_active') {
+      clearCatDienTimer(userId);
+      await sendZaloText(userId, '⏳ Đang tra cứu lịch cắt điện...');
+      try {
+        await sendOutageCard(userId, text);
+      } catch (err) {
+        console.error('[CatDien] Lỗi:', err.message);
+        await sendZaloText(userId, '⚠️ Không thể lấy lịch cắt điện. Vui lòng thử lại sau.');
+      }
+      await sendZaloText(userId,
+        '✅ Thông tin đã hoàn tất, bạn cần tra cứu thêm không?\n' +
+        '(Quá trình sẽ tự động ngắt sau 10 giây)'
+      );
+      armCatDienTimer(userId);
       return;
     }
 

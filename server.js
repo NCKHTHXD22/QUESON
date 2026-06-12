@@ -190,6 +190,9 @@ app.post('/internal/sync-followers', async (req, res) => {
 // ── Scheduler gửi tin nhắn theo lịch ──────────────────
 require('./src/services/schedulerService').start();
 
+// ── Tự động đồng bộ lịch cắt điện EVNCPC (mỗi 30 phút) ──
+require('./src/services/catDienService').startAutoSync();
+
 // ── REST API cho React frontend ────────────────────────
 const apiRouter = require('./src/routes/index');
 app.use('/api', apiRouter);

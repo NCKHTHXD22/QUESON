@@ -57,8 +57,8 @@ const menuConfig = {
       sub_menu: [
         {
           title: '⚡ Tra cứu ngắt điện',
-          type: 'link',
-          payload: 'https://zalo-evn-backend-vugia.vercel.app/',
+          type: 'text',
+          payload: '#lichcatdien',
         },
         {
           title: '💧 Lịch cắt nước',

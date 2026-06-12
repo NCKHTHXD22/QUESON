@@ -7,8 +7,12 @@ const userRoutes = require('./users')
 const categoryRoutes = require('./categories')
 const zaloMembersRoutes = require('./zalo-members')
 const broadcastRoutes = require('./broadcast')
+const catDienRoutes = require('./cat-dien')
 
 router.use('/auth', authRoutes)
+
+// Công khai (không cần đăng nhập) — dữ liệu lịch cắt điện công cộng
+router.use('/cat-dien', catDienRoutes)
 
 router.use(requireAuth)
 router.use('/stats', statsRoutes)
