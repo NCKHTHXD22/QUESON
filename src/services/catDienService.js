@@ -6,7 +6,7 @@ const { sendZaloText, uploadImageToZalo, sendZaloImage } = require('../utils/zal
 const { htmlToPng } = require('../utils/imageGen');
 
 const DAYS_AHEAD = 14;
-const CARD_MAX_ITEMS = 8;
+const CARD_MAX_ITEMS = 15;
 
 function fmt(d) {
   const p = (n) => String(n).padStart(2, '0');
@@ -138,8 +138,14 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function pad(n) { return String(n).padStart(2, '0'); }
-function dDate(d) { const x = new Date(d); return `${pad(x.getDate())}/${pad(x.getMonth() + 1)}/${x.getFullYear()}`; }
-function dTime(d) { const x = new Date(d); return `${pad(x.getHours())}:${pad(x.getMinutes())}`; }
+function dDate(d) {
+  const x = new Date(new Date(d).getTime() + 7 * 3600000);
+  return `${pad(x.getUTCDate())}/${pad(x.getUTCMonth() + 1)}/${x.getUTCFullYear()}`;
+}
+function dTime(d) {
+  const x = new Date(new Date(d).getTime() + 7 * 3600000);
+  return `${pad(x.getUTCHours())}:${pad(x.getUTCMinutes())}`;
+}
 function typeColor(t) {
   const x = (t || '').toLowerCase();
   if (x.includes('sự cố') || x.includes('đột xuất')) return '#e53935';
@@ -201,9 +207,13 @@ function formatText(items, query = '') {
   if (!items.length) {
     return `✅ Hiện không có lịch tạm ngừng cấp điện${query ? ` cho "${query}"` : ''}.\n\n📍 Nguồn: EVNCPC`;
   }
-  const lines = items.slice(0, CARD_MAX_ITEMS).map((it, i) =>
+  const shown = items.slice(0, CARD_MAX_ITEMS);
+  const lines = shown.map((it, i) =>
     `${i + 1}. ${it.stationName} [${it.outageType}]\n   ⏰ ${dDate(it.fromDate)} ${dTime(it.fromDate)} – ${dTime(it.toDate)}`
   );
+  if (items.length > CARD_MAX_ITEMS) {
+    lines.push(`... và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
+  }
   return `⚡ LỊCH TẠM NGỪNG CẤP ĐIỆN — QUẾ SƠN\n━━━━━━━━━━━━━━━━━━━\n${lines.join('\n\n')}\n━━━━━━━━━━━━━━━━━━━\n📍 Nguồn: EVNCPC`;
 }
 
