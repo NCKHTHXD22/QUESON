@@ -105,7 +105,9 @@ async function syncOutages() {
 // subOrgCode mặc định = đơn vị của OA này (Quế Sơn). Truyền '' hoặc 'all' để xem toàn TP.
 async function getOutages(query = '', subOrgCode = CONFIG.EVNCPC_SUBORG_CODE) {
   const q = (query || '').toLowerCase().trim().normalize('NFC');
-  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const vnNow = new Date(now.getTime() + (7 * 3600000));
+  const startOfToday = new Date(Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate(), -7, 0, 0, 0));
 
   const filter = {};
   if (subOrgCode && subOrgCode !== 'all') filter.subOrgCode = subOrgCode;
@@ -113,12 +115,18 @@ async function getOutages(query = '', subOrgCode = CONFIG.EVNCPC_SUBORG_CODE) {
   const dateMatch = q.match(/^(\d{1,2})[/-](\d{1,2})$/);
   if (dateMatch) {
     const [, d, m] = dateMatch;
-    const y = new Date().getFullYear();
-    filter.fromDate = { $gte: new Date(y, m - 1, d, 0, 0, 0), $lte: new Date(y, m - 1, d, 23, 59, 59) };
+    const y = vnNow.getUTCFullYear();
+    const start = new Date(Date.UTC(y, parseInt(m) - 1, parseInt(d), -7, 0, 0, 0));
+    const end = new Date(Date.UTC(y, parseInt(m) - 1, parseInt(d), 16, 59, 59, 999));
+    filter.fromDate = { $gte: start, $lte: end };
   } else {
     filter.toDate = { $gte: startOfToday }; // chỉ lịch còn hiệu lực
     if (q && !['tất cả', 'tat ca', 'tatca'].includes(q)) {
-      filter.stationName = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { stationName: regex },
+        { reason: regex }
+      ];
     }
   }
 
