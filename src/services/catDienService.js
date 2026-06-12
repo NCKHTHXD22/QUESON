@@ -29,7 +29,7 @@ async function fetchOutagesForSubOrg(subOrgCode) {
   const to = new Date(); to.setDate(to.getDate() + DAYS_AHEAD); to.setHours(23, 59, 59, 0);
 
   const items = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; page <= 50; page++) {
     const res = await axios.get(CONFIG.EVNCPC_API_URL, {
       headers: { version: '1.0', Accept: 'application/json' },
       params: {
@@ -40,7 +40,8 @@ async function fetchOutagesForSubOrg(subOrgCode) {
     });
     const batch = res.data?.items || [];
     items.push(...batch);
-    if (batch.length < 100) break;
+    if (batch.length === 0) break;
+    await new Promise(r => setTimeout(r, 500)); // Delay between pages
   }
   return items;
 }
