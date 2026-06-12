@@ -243,6 +243,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', project: 'UBND Quế Sơn - Góp ý', timestamp: new Date().toISOString() });
 });
 
+// ── Serve file upload tạm (video broadcast) tại /images ──
+const uploadDir = path.join(__dirname, 'public', 'images');
+require('fs').mkdirSync(uploadDir, { recursive: true });
+app.use('/images', express.static(uploadDir));
+
 // ── Serve React build (production) ─────────────────────
 const webDist = path.join(__dirname, 'Web', 'dist');
 if (require('fs').existsSync(webDist)) {
