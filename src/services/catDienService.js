@@ -170,8 +170,8 @@ function getCardHtml(items, query = '') {
     </div>`;
   }).join('');
   const more = items.length > CARD_MAX_ITEMS
-    ? `<div class="more">… và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên Thôn/Khối phố để xem cụ thể.</div>` : '';
-  const empty = `<div class="empty">✅ Hiện không có lịch tạm ngừng cấp điện${query ? ` cho "<b>${escapeHtml(query)}</b>"` : ''}.<br>Thử nhập tên Thôn/Khối phố khác hoặc ngày (vd 12/06).</div>`;
+    ? `<div class="more">… và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.</div>` : '';
+  const empty = `<div class="empty">✅ Hiện không có lịch tạm ngừng cấp điện${query ? ` cho "<b>${escapeHtml(query)}</b>"` : ''}.<br>Thử nhập tên trạm khác hoặc ngày (vd 12/06).</div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -210,11 +210,11 @@ function formatText(items, query = '') {
   }
   const shown = items.slice(0, CARD_MAX_ITEMS);
   const lines = shown.map((it, i) => {
-    const reasonStr = it.reason ? `\n   📍 Khu vực: ${it.reason.trim()}` : '';
+    const reasonStr = it.reason ? `\n   ℹ️ Chi tiết: ${it.reason.trim()}` : '';
     return `${i + 1}. ${it.stationName} [${it.outageType}]\n   ⏰ ${dDate(it.fromDate)} ${dTime(it.fromDate)} – ${dTime(it.toDate)}${reasonStr}`;
   });
   if (items.length > CARD_MAX_ITEMS) {
-    lines.push(`... và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên Thôn/Khối phố để xem cụ thể.`);
+    lines.push(`... và ${items.length - CARD_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
   }
   return `⚡ LỊCH TẠM NGỪNG CẤP ĐIỆN — QUẾ SƠN\n━━━━━━━━━━━━━━━━━━━\n${lines.join('\n\n')}\n━━━━━━━━━━━━━━━━━━━\n📍 Nguồn: EVNCPC`;
 }

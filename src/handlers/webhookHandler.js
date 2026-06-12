@@ -190,8 +190,8 @@ async function handleWebhook(body) {
       clearCatDienTimer(userId);
       await sendZaloText(userId,
         '⚡ Tra cứu lịch tạm ngừng cấp điện tại Quế Sơn.\n\n' +
-        'Nhập tên 📍 Thôn/Khối phố hoặc 📅 ngày để tra cứu.\n' +
-        'Ví dụ: Quế Cường  hoặc  12/06\n\n' +
+        'Nhập tên 📍 trạm hoặc 📅 ngày để tra cứu.\n' +
+        'Ví dụ: Lộc Đại  hoặc  12/06\n\n' +
         '(Nhắn "tất cả" để xem toàn bộ · Nhắn "huỷ" để thoát)'
       );
       return;
