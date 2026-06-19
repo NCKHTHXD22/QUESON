@@ -29,7 +29,7 @@ async function fetchOutagesForSubOrg(subOrgCode) {
   const to = new Date(); to.setDate(to.getDate() + DAYS_AHEAD); to.setHours(23, 59, 59, 0);
 
   const items = [];
-  for (let page = 1; page <= 50; page++) {
+  for (let page = 1; page <= 10; page++) {
     const res = await axios.get(CONFIG.EVNCPC_API_URL, {
       headers: { version: '1.0', Accept: 'application/json' },
       params: {
@@ -40,8 +40,9 @@ async function fetchOutagesForSubOrg(subOrgCode) {
     });
     const batch = res.data?.items || [];
     items.push(...batch);
-    if (batch.length === 0) break;
-    await new Promise(r => setTimeout(r, 500)); // Delay between pages
+    // EVNCPC trả hết lịch của đơn vị trong 1 trang (~10-30 mục < 100) → dừng ngay.
+    // (KHÔNG break theo length===0 + 50 trang: gây ~900 request/sync → rate-limit → bỏ qua đơn vị như Quế Sơn)
+    if (batch.length < 100) break;
   }
   return items;
 }
