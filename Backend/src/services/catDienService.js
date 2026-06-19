@@ -209,16 +209,20 @@ function formatText(items, query = '') {
   if (!items.length) {
     return `✅ Hiện không có lịch tạm ngừng cấp điện${query ? ` cho "${query}"` : ''}.\n\n📍 Nguồn: EVNCPC`;
   }
-  const TEXT_MAX_ITEMS = 7;
+  const TEXT_MAX_ITEMS = 6;
   const shown = items.slice(0, TEXT_MAX_ITEMS);
   const lines = shown.map((it, i) => {
-    const reasonStr = it.reason ? `\n   ℹ️ Chi tiết: ${it.reason.trim()}` : '';
+    // Rút gọn lý do (≤60 ký tự) để tránh vượt giới hạn 2000 ký tự của Zalo (-210)
+    const r = (it.reason || '').trim().replace(/\s+/g, ' ');
+    const reasonStr = r ? `\n   ℹ️ ${r.length > 60 ? r.slice(0, 60) + '…' : r}` : '';
     return `${i + 1}. ${it.stationName} [${it.outageType}]\n   ⏰ ${dDate(it.fromDate)} ${dTime(it.fromDate)} – ${dTime(it.toDate)}${reasonStr}`;
   });
   if (items.length > TEXT_MAX_ITEMS) {
-    lines.push(`... và ${items.length - TEXT_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
+    lines.push(`… và ${items.length - TEXT_MAX_ITEMS} khu vực khác. Nhắn tên trạm để xem cụ thể.`);
   }
-  return `⚡ LỊCH TẠM NGỪNG CẤP ĐIỆN — QUẾ SƠN\n━━━━━━━━━━━━━━━━━━━\n${lines.join('\n\n')}\n━━━━━━━━━━━━━━━━━━━\n📍 Nguồn: EVNCPC`;
+  let msg = `⚡ LỊCH TẠM NGỪNG CẤP ĐIỆN — QUẾ SƠN\n━━━━━━━━━━━━━━━━━━━\n${lines.join('\n\n')}\n━━━━━━━━━━━━━━━━━━━\n📍 Nguồn: EVNCPC`;
+  if (msg.length > 1900) msg = msg.slice(0, 1900) + '…'; // chốt chặn an toàn
+  return msg;
 }
 
 // Tra cứu + gửi card ảnh (fallback text nếu render lỗi). Trả về số mục tìm được.
