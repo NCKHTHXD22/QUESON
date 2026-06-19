@@ -88,9 +88,21 @@ async function fetchAllOutages() {
 
 // ─── Cào + lưu vào Mongo (upsert chống trùng) ───
 async function syncOutages() {
-  const docs = await fetchAllOutages();
+  // Chỉ cào ĐÚNG đơn vị của OA này (vd Quế Sơn PC05MM) — 1 request/lần.
+  // Cào cả 18 đơn vị bị EVNCPC rate-limit (429) từ IP VPS → các đơn vị cuối (Quế Sơn) bị bỏ qua.
+  const code = CONFIG.EVNCPC_SUBORG_CODE;
+  let items;
+  try {
+    items = await fetchOutagesForSubOrg(code);
+  } catch (e1) {
+    await new Promise((r) => setTimeout(r, 3000)); // 1 lần thử lại nếu lỗi tạm
+    try { items = await fetchOutagesForSubOrg(code); }
+    catch (e2) { console.error(`[CatDien] Cào đơn vị ${code} thất bại: ${e2.message}`); return 0; }
+  }
   let upserted = 0;
-  for (const doc of docs) {
+  for (const it of items) {
+    const doc = toDoc(it);
+    if (!doc.subOrgCode) doc.subOrgCode = code;
     if (!doc.stationCode || !doc.fromDate || !doc.toDate) continue;
     await PowerOutage.updateOne(
       { stationCode: doc.stationCode, fromDate: doc.fromDate, toDate: doc.toDate },
@@ -99,7 +111,7 @@ async function syncOutages() {
     );
     upserted++;
   }
-  console.log(`[CatDien] Đồng bộ ${upserted} lịch cắt điện toàn Điện lực Đà Nẵng`);
+  console.log(`[CatDien] Đồng bộ ${upserted} lịch cắt điện (đơn vị ${code})`);
   return upserted;
 }
 
