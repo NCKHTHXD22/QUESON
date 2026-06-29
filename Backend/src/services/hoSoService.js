@@ -95,8 +95,8 @@ function getDossierHtml(dossier) {
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: Arial, sans-serif; background: white; width: 520px; }
 .card { width: 520px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-.header { background: #1565C0; padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
-.logo { width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.header { background: #1976D2; padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
+.logo { width: 44px; height: 44px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .header-title { color: white; font-size: 15px; font-weight: bold; }
 .header-sub { color: rgba(255,255,255,0.8); font-size: 12px; margin-top: 3px; }
 table { width: 100%; border-collapse: collapse; }
@@ -111,9 +111,9 @@ td { padding: 11px 18px; font-size: 13px; vertical-align: top; }
 </style></head>
 <body><div class="card">
   <div class="header">
-    <div class="logo">🏛️</div>
+    <div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1976D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
     <div>
-      <div class="header-title">UBND Quế Sơn</div>
+      <div class="header-title">Thông tin xã Quế Sơn</div>
       <div class="header-sub">Tra cứu hồ sơ hành chính</div>
     </div>
   </div>
