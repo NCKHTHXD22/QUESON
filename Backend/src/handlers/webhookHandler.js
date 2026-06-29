@@ -159,7 +159,7 @@ async function handleWebhook(body) {
       'Xin chào! Chào mừng bạn quan tâm OA UBND Quế Sơn 🏛️\n\n' +
       'Bạn có thể:\n' +
       '• 📝 Gửi góp ý, phản ánh — chọn "Góp ý" hoặc nhắn #goopy\n' +
-      '• 📋 Tra cứu hồ sơ hành chính — nhắn #tracuuhoso\n' +
+      '• 📋 Tra cứu thủ tục hành chính — nhắn #tracuuhoso\n' +
       '• 💧 Xem lịch cắt nước — nhắn #lichcatnuoc'
     );
     return;

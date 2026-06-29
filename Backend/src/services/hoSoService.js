@@ -125,7 +125,7 @@ td { padding: 11px 18px; font-size: 13px; vertical-align: top; }
     <div class="logo">${LOGO_DATA_URI ? `<img src="${LOGO_DATA_URI}" style="width:40px;height:40px;object-fit:contain;" />` : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1976D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}</div>
     <div>
       <div class="header-title">Thông tin xã Quế Sơn</div>
-      <div class="header-sub">Tra cứu hồ sơ hành chính</div>
+      <div class="header-sub">Tra cứu thủ tục hành chính</div>
     </div>
   </div>
   <table>
