@@ -33,13 +33,31 @@ async function getIoctcToken() {
 
 async function searchDossier(code) {
   const token = await getIoctcToken();
-  const res = await axios.get(`${CONFIG.IOCTC_BASE_URL}/tra-cuu`, {
-    headers: { Authorization: `Bearer ${token}`, 'Accept': 'application/json' },
-    params: { ma_ho_so: code.trim().toUpperCase() },
-    timeout: 15000,
-  });
-  console.log('[IOCTC] TongSo:', res.data?.TongSo);
-  return res.data;
+  const maHoSo = code.trim().toUpperCase();
+  // IOCTC thỉnh thoảng trả 500 (CAPTCHA/scrape lỗi tạm) → thử lại tối đa 3 lần
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await axios.get(`${CONFIG.IOCTC_BASE_URL}/tra-cuu`, {
+        headers: { Authorization: `Bearer ${token}`, 'Accept': 'application/json' },
+        params: { ma_ho_so: maHoSo },
+        timeout: 15000,
+      });
+      console.log('[IOCTC] TongSo:', res.data?.TongSo);
+      return res.data;
+    } catch (err) {
+      lastErr = err;
+      const status = err.response?.status;
+      // 500 (lỗi CAPTCHA chập chờn) hoặc không có response (timeout/mạng) → thử lại
+      if ((status === 500 || !err.response) && attempt < 3) {
+        console.warn(`[IOCTC] tra-cuu lỗi ${status || err.code} (lần ${attempt}), thử lại sau 1.5s...`);
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 function formatDate(dateField) {
