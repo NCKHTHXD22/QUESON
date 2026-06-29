@@ -140,6 +140,26 @@ async function sendZaloImages(userId, attachmentIds) {
   }
 }
 
+// Gửi 1 ảnh đến user (dùng cho card hồ sơ / cắt điện / cắt nước)
+async function sendZaloImage(userId, attachmentId) {
+  const res = await zaloPost('https://openapi.zalo.me/v2.0/oa/message', {
+    recipient: { user_id: String(userId) },
+    message: {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'media',
+          elements: [{ media_type: 'image', attachment_id: attachmentId }],
+        },
+      },
+    },
+  });
+  if (res.data?.error !== 0) {
+    console.error('[Zalo] Lỗi gửi ảnh:', res.data);
+    throw new Error(`Zalo image error ${res.data?.error}: ${res.data?.message}`);
+  }
+}
+
 // Gửi nhiều ảnh vào nhóm
 async function sendZaloImagesToGroup(groupId, attachmentIds) {
   for (const attachId of attachmentIds) {
@@ -375,6 +395,7 @@ module.exports = {
   sendZaloButtons,
   sendZaloToGroup,
   sendZaloGroupText,
+  sendZaloImage,
   sendZaloImages,
   sendZaloImagesToGroup,
   sendZaloImageWithLink,
